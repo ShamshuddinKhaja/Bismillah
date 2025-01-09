@@ -4,8 +4,8 @@ import os
 from subprocess import run
 
 # Set up repository details
-REPO_URL = "https://github.com/your-username/boutique-app.git"
-CSV_FILE = "customers.csv"
+REPO_URL = "https://github.com/ShamshuddinKhaja/Bismillah/tree/main"
+CSV_FILE = " Customers.csv"
 
 # Clone the repository (only if it hasn't been cloned already)
 if not os.path.exists("repo"):
@@ -26,7 +26,7 @@ def save_data():
     global df
     df.to_csv(CSV_FILE, index=False)
     run(["git", "add", CSV_FILE])
-    run(["git", "commit", "-m", "Update customers.csv"])
+    run(["git", "commit", "-m", "Update Customers.csv"])
     run(["git", "push", f"https://{os.getenv('GITHUB_TOKEN')}@github.com/your-username/boutique-app.git"])
 
 # Streamlit Pages
@@ -59,7 +59,7 @@ def add_customer_page():
 def view_customers_page():
     st.title("All Customers")
     st.dataframe(df)
-    st.download_button("Download CSV", df.to_csv(index=False), "customers.csv", "text/csv")
+    st.download_button("Download CSV", df.to_csv(index=False), "Customers.csv", "text/csv")
 
 def main():
     st.sidebar.title("Boutique Management")

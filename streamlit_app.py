@@ -77,14 +77,21 @@ def add_customer_page():
         # Save uploaded images as file names (placeholder, actual implementation can differ)
         image_links = [f"image_placeholder/{uploaded_file.name}" for uploaded_file in uploaded_files]
 
-        # Add new customer to DataFrame
-        df = df.append(
-            {"Name": name, "Contact": contact, "Bill Number": bill, "Image Links": ','.join(image_links)},
-            ignore_index=True,
-        )
+        # Create a new row as a DataFrame
+        new_customer = pd.DataFrame([{
+            "Name": name,
+            "Contact": contact,
+            "Bill Number": bill,
+            "Image Links": ','.join(image_links),
+        }])
+
+        # Concatenate the new row to the DataFrame
+        df = pd.concat([df, new_customer], ignore_index=True)
 
         # Save data to GitHub
         save_data(df)
+        st.success("Customer added successfully!")
+
 
 
 def view_customers_page():

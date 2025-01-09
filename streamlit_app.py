@@ -71,23 +71,9 @@ def upload_image(contact, file):
     file_path = f"{folder_path}/{file_name}"
 
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
-    # Ensure folder structure exists
-    folder_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{folder_path}"
-    folder_response = requests.get(folder_url, headers=headers)
-    
-    if folder_response.status_code == 404:  # Folder doesn't exist
-        st.info(f"Creating folder: {folder_path}")
-        # GitHub doesn't require a separate folder creation step; this initializes the structure.
-        payload = {
-            "message": f"Initialize folder {folder_path}",
-            "content": base64.b64encode("".encode("utf-8")).decode("utf-8"),
-            "branch": "main",
-            "path": f"{folder_path}/.gitkeep",  # Add a dummy file to initialize the folder
-        }
-        requests.put(folder_url, headers=headers, data=json.dumps(payload))
-
-    # Upload the image
     file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+    
+    # Upload the image directly
     payload = {
         "message": f"Add image {file_name} for customer {contact}",
         "content": base64.b64encode(file_content).decode("utf-8"),
@@ -166,8 +152,10 @@ def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
     if search_query:
-        results = df[(df["Name"].str.contains(search_query, case=False, na=False)) |
-                     (df["Contact"].str.contains(search_query, case=False, na=False))]
+        results = df[
+            df["Name"].str.contains(search_query, case=False, na=False) |
+            df["Contact"].str.contains(search_query, case=False, na=False)
+        ]
         if not results.empty:
             st.dataframe(results)
             selected_contact = st.selectbox("Select a customer to view details", results["Contact"].values)

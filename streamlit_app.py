@@ -4,7 +4,7 @@ import requests
 import base64
 import json
 from PIL import Image
-from io import BytesIO
+from io import BytesIO, StringIO
 
 # GitHub repository details
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
@@ -23,7 +23,7 @@ def load_data():
     if response.status_code == 200:
         try:
             file_content = base64.b64decode(response.json()["content"])
-            return pd.read_csv(pd.compat.StringIO(file_content.decode("utf-8")))
+            return pd.read_csv(StringIO(file_content.decode("utf-8")))  # Use io.StringIO
         except Exception as e:
             st.error(f"Error reading the dataset: {e}")
             return pd.DataFrame(columns=["Name", "Contact", "Bill Number", "Image Links"])
@@ -66,25 +66,33 @@ def upload_image(contact, file):
     file_content = file.read()
     file_name = file.name
 
+    # Define the folder and file paths
     folder_path = f"images/{contact}"  # Folder for contact
     file_path = f"{folder_path}/{file_name}"
 
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    # Ensure folder structure exists
+    folder_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{folder_path}"
+    folder_response = requests.get(folder_url, headers=headers)
+    
+    if folder_response.status_code == 404:  # Folder doesn't exist
+        st.info(f"Creating folder: {folder_path}")
+        # GitHub doesn't require a separate folder creation step; this initializes the structure.
+        payload = {
+            "message": f"Initialize folder {folder_path}",
+            "content": base64.b64encode("".encode("utf-8")).decode("utf-8"),
+            "branch": "main",
+            "path": f"{folder_path}/.gitkeep",  # Add a dummy file to initialize the folder
+        }
+        requests.put(folder_url, headers=headers, data=json.dumps(payload))
+
+    # Upload the image
+    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     payload = {
         "message": f"Add image {file_name} for customer {contact}",
         "content": base64.b64encode(file_content).decode("utf-8"),
         "branch": "main",
     }
-
-    # Create folder if it doesn't exist
-    folder_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{folder_path}"
-    folder_response = requests.get(folder_url, headers=headers)
-    if folder_response.status_code != 200:  # Folder doesn't exist
-        payload["message"] = f"Create folder {folder_path}"
-        requests.put(folder_url, headers=headers, data=json.dumps(payload))
-
-    # Upload the image
-    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     response = requests.put(file_url, headers=headers, data=json.dumps(payload))
     if response.status_code in [200, 201]:
         return file_path
@@ -95,16 +103,26 @@ def upload_image(contact, file):
 
 
 # Display images in gallery
-def display_gallery(image_links):
-    st.title("Image Gallery")
-    for link in image_links.split(","):
-        image_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{link}"
-        response = requests.get(image_url)
-        if response.status_code == 200:
-            image = Image.open(BytesIO(response.content))
-            st.image(image, use_column_width=True)
-        else:
-            st.error(f"Failed to load image: {link}")
+def display_gallery(contact):
+    st.title(f"Image Gallery for Contact: {contact}")
+    folder_path = f"images/{contact}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    folder_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{folder_path}"
+
+    response = requests.get(folder_url, headers=headers)
+    if response.status_code == 200:
+        files = response.json()
+        for file in files:
+            if file["type"] == "file":  # Ensure it's a file
+                image_url = file["download_url"]
+                response = requests.get(image_url)
+                if response.status_code == 200:
+                    image = Image.open(BytesIO(response.content))
+                    st.image(image, use_column_width=True)
+                else:
+                    st.warning(f"Could not load image: {image_url}")
+    else:
+        st.error("No images found for this customer.")
 
 
 # Pages
@@ -158,7 +176,7 @@ def search_customer_page():
                 st.write("Name:", customer["Name"])
                 st.write("Contact:", customer["Contact"])
                 st.write("Bill Number:", customer["Bill Number"])
-                display_gallery(customer["Image Links"])
+                display_gallery(selected_contact)
         else:
             st.warning("No matching customers found.")
 

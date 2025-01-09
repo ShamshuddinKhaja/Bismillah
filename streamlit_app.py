@@ -114,17 +114,26 @@ def add_customer_page():
 def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
+    
+    # Ensure `df` is available
     if df.empty:
         st.warning("No data found. Please add customers first.")
         return
 
     if search_query:
+        # Convert columns to strings and handle NaN values
+        df["Name"] = df["Name"].fillna("").astype(str)
+        df["Contact"] = df["Contact"].fillna("").astype(str)
+
+        # Filter results based on search query
         results = df[
             df["Name"].str.contains(search_query, case=False, na=False) |
             df["Contact"].str.contains(search_query, case=False, na=False)
         ]
+        
         if not results.empty:
             st.dataframe(results)
+
             selected_contact = st.selectbox(
                 "Select a customer to view details", results["Contact"].values
             )
@@ -133,13 +142,14 @@ def search_customer_page():
                 st.write("**Name:**", customer["Name"])
                 st.write("**Contact:**", customer["Contact"])
                 st.write("**Bill Number:**", customer["Bill Number"])
+
+                # Display images for the customer
                 if customer["Image Links"]:
                     display_gallery(customer["Contact"])
                 else:
                     st.info("No images found for this customer.")
         else:
             st.warning("No matching customers found.")
-
 
 def view_customers_page():
     st.title("View All Customers")

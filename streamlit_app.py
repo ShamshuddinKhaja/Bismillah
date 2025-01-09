@@ -5,7 +5,7 @@ import base64
 import json
 
 # GitHub repository details
-GITHUB_TOKEN = st.secrets["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"]  # Add your token in Streamlit Secrets
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # Add your token in Streamlit Secrets
 GITHUB_REPO = "ShamshuddinKhaja/Bismillah"  # Replace with your repo
 GITHUB_FILE_PATH = "Customers.csv"  # Path to the CSV file in your repository
 

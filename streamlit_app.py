@@ -66,17 +66,16 @@ def display_gallery(contact):
     if response.status_code == 200:
         files = response.json()
         for file in files:
-            if file["type"] == "file":
+            if file["type"] == "file":  # Ensure it's a file
                 image_url = file["download_url"]
                 response = requests.get(image_url)
                 if response.status_code == 200:
                     image = Image.open(BytesIO(response.content))
-                    st.image(image, use_column_width=True)
+                    st.image(image, use_container_width=True)  # Use the updated parameter
                 else:
                     st.warning(f"Could not load image: {image_url}")
     else:
         st.info("No images found for this customer.")
-
 
 def home_page():
     st.title("Welcome to Boutique Management App")

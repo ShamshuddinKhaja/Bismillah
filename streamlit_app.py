@@ -188,6 +188,7 @@ def view_customers_page():
             file_name="Customers.csv",
             mime="text/csv"
         )
+#--------------------------------------------------------
 
 def edit_customer_page():
     st.title("Edit Customer")
@@ -271,7 +272,7 @@ def edit_customer_page():
             # Update customer data in DataFrame
             df.loc[df["Contact"] == selected_contact, "Name"] = name
             df.loc[df["Contact"] == selected_contact, "Bill Number"] = bill_numbers
-            updated_images = list(set(existing_images) + new_image_links)  # Add new images
+            updated_images = list(set(existing_images + new_image_links))  # Add new images
             df.loc[df["Contact"] == selected_contact, "Image Links"] = ",".join(updated_images)
             
             # Save updated data to GitHub
@@ -280,32 +281,33 @@ def edit_customer_page():
             st.experimental_rerun()  # Reboot the app to reflect changes
 
 
-# Function to delete an image from GitHub
-def delete_image_from_github(image_path):
+def delete_image_from_github(image_link):
+    """Delete an image from the GitHub repository."""
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
-    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{image_path}"
-    
-    # Check if the file exists and retrieve its SHA
-    response = requests.get(file_url, headers=headers)
+    response = requests.get(image_link.replace("https://raw.githubusercontent.com/", 
+                                               "https://api.github.com/repos/").replace("/main/", "/contents/"), 
+                            headers=headers)
     if response.status_code == 200:
         sha = response.json().get("sha")
-        
-        # Prepare payload to delete the file
+        file_url = response.url
         payload = {
-            "message": f"Delete image {image_path}",
+            "message": f"Delete image {image_link.split('/')[-1]}",
             "sha": sha,
             "branch": "main",
         }
         delete_response = requests.delete(file_url, headers=headers, data=json.dumps(payload))
         if delete_response.status_code in [200, 204]:
-            st.success(f"Image {image_path.split('/')[-1]} deleted successfully!")
+            return True
         else:
-            st.error(f"Failed to delete image {image_path.split('/')[-1]}.")
-            st.error(f"Error Response: {delete_response.json()}")
+            st.error(f"Failed to delete {image_link}. Error: {delete_response.json()}")
+            return False
     else:
-        st.error(f"Image {image_path.split('/')[-1]} not found on GitHub.")
+        st.error(f"Failed to fetch file information for {image_link}. Error: {response.json()}")
+        return False
 
 
+
+#--------------------------------------------------------
 # Main function
 def main():
     global df

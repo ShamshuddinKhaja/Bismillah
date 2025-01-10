@@ -217,6 +217,7 @@ def edit_customer_page():
         # Display existing images
         st.subheader("Existing Images")
         existing_images = str(customer["Image Links"]).split(",") if pd.notna(customer["Image Links"]) else []
+        existing_images = [img for img in existing_images if img]  # Filter out empty or None values
         images_to_remove = []
         
         for image_link in existing_images:
@@ -237,10 +238,14 @@ def edit_customer_page():
         
         # Save changes
         if st.button("Save Changes"):
+            # Ensure all lists contain valid strings
+            images_to_remove = [img for img in images_to_remove if img]
+            new_image_links = [img for img in new_image_links if img]
+            
             # Update customer data in DataFrame
             df.loc[df["Contact"] == contact, "Name"] = name
             df.loc[df["Contact"] == contact, "Bill Number"] = bill_numbers
-            updated_images = list(set(existing_images) - set(images_to_remove) + new_image_links)
+            updated_images = list(set(existing_images) - set(images_to_remove)) + new_image_links
             df.loc[df["Contact"] == contact, "Image Links"] = ",".join(updated_images)
             
             # Save updated data to GitHub

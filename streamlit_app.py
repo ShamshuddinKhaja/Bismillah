@@ -11,8 +11,11 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = "ShamshuddinKhaja/Bismillah"
 GITHUB_FILE_PATH = "Customers.csv"
 
+# GitHub API endpoints
 API_BASE_URL = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
 
+
+# Load the CSV file from GitHub
 @st.cache_data
 def load_data():
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
@@ -21,7 +24,7 @@ def load_data():
     if response.status_code == 200:
         try:
             file_content = base64.b64decode(response.json()["content"])
-            return pd.read_csv(StringIO(file_content.decode("utf-8")))
+            return pd.read_csv(StringIO(file_content.decode("utf-8")))  # Use io.StringIO
         except Exception as e:
             st.error(f"Error reading the dataset: {e}")
             return pd.DataFrame(columns=["Name", "Contact", "Bill Number", "Image Links"])
@@ -30,6 +33,7 @@ def load_data():
         return pd.DataFrame(columns=["Name", "Contact", "Bill Number", "Image Links"])
 
 
+# Save the CSV file back to GitHub
 def save_data(df):
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
     response = requests.get(API_BASE_URL, headers=headers)
@@ -50,12 +54,42 @@ def save_data(df):
         payload["sha"] = sha
 
     response = requests.put(API_BASE_URL, headers=headers, data=json.dumps(payload))
-    if response.status_code not in [200, 201]:
-        st.error("Failed to save data. Check GitHub configuration.")
+    if response.status_code in [200, 201]:
+        st.success("Data saved successfully!")
+    else:
+        st.error("Failed to save data. Please check your GitHub configuration.")
         st.error(f"Status Code: {response.status_code}")
         st.error(f"Response: {response.json()}")
 
 
+# Upload images to GitHub
+def upload_image(contact, file):
+    file_content = file.read()
+    file_name = file.name
+
+    # Define the folder and file paths
+    folder_path = f"images/{contact}"  # Folder for contact
+    file_path = f"{folder_path}/{file_name}"
+
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+    
+    # Upload the image directly
+    payload = {
+        "message": f"Add image {file_name} for customer {contact}",
+        "content": base64.b64encode(file_content).decode("utf-8"),
+        "branch": "main",
+    }
+    response = requests.put(file_url, headers=headers, data=json.dumps(payload))
+    if response.status_code in [200, 201]:
+        return file_path
+    else:
+        st.error(f"Failed to upload image {file_name}.")
+        st.error(f"Error Response: {response.json()}")
+        return None
+
+
+# Display images in gallery
 def display_gallery(contact):
     st.title(f"Image Gallery for Contact: {contact}")
     folder_path = f"images/{contact}"
@@ -71,12 +105,14 @@ def display_gallery(contact):
                 response = requests.get(image_url)
                 if response.status_code == 200:
                     image = Image.open(BytesIO(response.content))
-                    st.image(image, use_container_width=True)  # Use the updated parameter
+                    st.image(image, use_container_width=True)
                 else:
                     st.warning(f"Could not load image: {image_url}")
     else:
-        st.info("No images found for this customer.")
+        st.error("No images found for this customer.")
 
+
+# Pages
 def home_page():
     st.title("Welcome to Boutique Management App")
     st.markdown("Manage customer details, bills, and uploaded images with ease.")
@@ -95,11 +131,14 @@ def add_customer_page():
             st.error("Please enter a valid contact number.")
             return
 
+        # Upload images to GitHub and get their links
         image_links = []
         for uploaded_file in uploaded_files:
-            file_path = f"images/{contact}/{uploaded_file.name}"
-            image_links.append(file_path)
+            file_path = upload_image(contact, uploaded_file)
+            if file_path:
+                image_links.append(file_path)
 
+        # Add new customer
         new_customer = pd.DataFrame([{
             "Name": name,
             "Contact": contact,
@@ -108,47 +147,32 @@ def add_customer_page():
         }])
         df = pd.concat([df, new_customer], ignore_index=True)
         save_data(df)
+        st.success("Customer added successfully!")
 
 
 def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
-    
-    # Ensure `df` is available
-    if df.empty:
-        st.warning("No data found. Please add customers first.")
-        return
-
     if search_query:
-        # Convert columns to strings and handle NaN values
         df["Name"] = df["Name"].fillna("").astype(str)
         df["Contact"] = df["Contact"].fillna("").astype(str)
 
-        # Filter results based on search query
         results = df[
             df["Name"].str.contains(search_query, case=False, na=False) |
             df["Contact"].str.contains(search_query, case=False, na=False)
         ]
-        
         if not results.empty:
             st.dataframe(results)
-
-            selected_contact = st.selectbox(
-                "Select a customer to view details", results["Contact"].values
-            )
+            selected_contact = st.selectbox("Select a customer to view details", results["Contact"].values)
             if selected_contact:
                 customer = df[df["Contact"] == selected_contact].iloc[0]
-                st.write("**Name:**", customer["Name"])
-                st.write("**Contact:**", customer["Contact"])
-                st.write("**Bill Number:**", customer["Bill Number"])
-
-                # Display images for the customer
-                if customer["Image Links"]:
-                    display_gallery(customer["Contact"])
-                else:
-                    st.info("No images found for this customer.")
+                st.write("Name:", customer["Name"])
+                st.write("Contact:", customer["Contact"])
+                st.write("Bill Number:", customer["Bill Number"])
+                display_gallery(selected_contact)
         else:
             st.warning("No matching customers found.")
+
 
 def view_customers_page():
     st.title("View All Customers")
@@ -164,6 +188,7 @@ def view_customers_page():
         )
 
 
+# Main function
 def main():
     global df
     df = load_data()

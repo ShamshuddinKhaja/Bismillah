@@ -248,9 +248,74 @@ def edit_customer_page():
             updated_images = list(set(existing_images) - set(images_to_remove)) + new_image_links
             df.loc[df["Contact"] == contact, "Image Links"] = ",".join(updated_images)
             
+            # Remove images from GitHub
+            for img_to_remove in images_to_remove:
+                delete_image_from_github(img_to_remove)
+            
             # Save updated data to GitHub
             save_data(df)
             st.success("Customer data updated successfully!")
+
+# Function to upload images to the customer's folder on GitHub
+def upload_image(contact, file):
+    file_content = file.read()
+    file_name = file.name
+
+    # Define the folder and file paths
+    folder_path = f"images/{contact}"  # Folder for contact
+    file_path = f"{folder_path}/{file_name}"
+
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+    
+    # Check if the file already exists on GitHub
+    response = requests.get(file_url, headers=headers)
+    sha = None
+    if response.status_code == 200:
+        sha = response.json().get("sha")  # Retrieve existing file's SHA
+
+    # Prepare the payload for GitHub API
+    payload = {
+        "message": f"Add image {file_name} for customer {contact}",
+        "content": base64.b64encode(file_content).decode("utf-8"),
+        "branch": "main",
+    }
+    if sha:
+        payload["sha"] = sha
+
+    # Upload or update the image
+    response = requests.put(file_url, headers=headers, data=json.dumps(payload))
+    if response.status_code in [200, 201]:
+        return file_path
+    else:
+        st.error(f"Failed to upload image {file_name}.")
+        st.error(f"Error Response: {response.json()}")
+        return None
+
+# Function to delete an image from GitHub
+def delete_image_from_github(image_path):
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{image_path}"
+    
+    # Check if the file exists and retrieve its SHA
+    response = requests.get(file_url, headers=headers)
+    if response.status_code == 200:
+        sha = response.json().get("sha")
+        
+        # Prepare payload to delete the file
+        payload = {
+            "message": f"Delete image {image_path}",
+            "sha": sha,
+            "branch": "main",
+        }
+        delete_response = requests.delete(file_url, headers=headers, data=json.dumps(payload))
+        if delete_response.status_code in [200, 204]:
+            st.success(f"Image {image_path.split('/')[-1]} deleted successfully!")
+        else:
+            st.error(f"Failed to delete image {image_path.split('/')[-1]}.")
+            st.error(f"Error Response: {delete_response.json()}")
+    else:
+        st.error(f"Image {image_path.split('/')[-1]} not found on GitHub.")
 
 # Main function
 def main():

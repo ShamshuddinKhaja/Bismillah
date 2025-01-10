@@ -153,6 +153,11 @@ def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
     if search_query:
+        # Convert columns to strings to safely apply .str.contains
+        df["Name"] = df["Name"].astype(str)
+        df["Contact"] = df["Contact"].astype(str)
+        
+        # Perform search
         results = df[
             df["Name"].str.contains(search_query, case=False, na=False) |
             df["Contact"].str.contains(search_query, case=False, na=False)

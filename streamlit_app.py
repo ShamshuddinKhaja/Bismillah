@@ -189,6 +189,61 @@ def view_customers_page():
             mime="text/csv"
         )
 
+def edit_customer_page():
+    st.title("Edit Customer")
+    
+    # Select customer by contact
+    if df.empty:
+        st.warning("No customers available. Please add customers first.")
+        return
+    
+    contact = st.selectbox("Select Customer by Contact Number", df["Contact"].unique())
+    
+    if contact:
+        # Fetch customer details
+        customer = df[df["Contact"] == contact].iloc[0]
+        
+        # Editable fields
+        name = st.text_input("Customer Name", value=customer["Name"])
+        existing_bills = customer["Bill Number"].split(",") if pd.notna(customer["Bill Number"]) else []
+        bill_numbers = st.text_area(
+            "Bill Numbers (Comma-Separated)",
+            value=",".join(existing_bills)
+        )
+        
+        # Display existing images
+        st.subheader("Existing Images")
+        existing_images = customer["Image Links"].split(",") if pd.notna(customer["Image Links"]) else []
+        images_to_remove = []
+        
+        for image_link in existing_images:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.image(image_link, caption=image_link.split("/")[-1], use_container_width=True)
+            with col2:
+                if st.button(f"Remove {image_link.split('/')[-1]}"):
+                    images_to_remove.append(image_link)
+        
+        # Upload new images
+        uploaded_files = st.file_uploader("Upload New Images", accept_multiple_files=True)
+        new_image_links = []
+        for uploaded_file in uploaded_files:
+            file_path = upload_image(contact, uploaded_file)
+            if file_path:
+                new_image_links.append(file_path)
+        
+        # Save changes
+        if st.button("Save Changes"):
+            # Update customer data in DataFrame
+            df.loc[df["Contact"] == contact, "Name"] = name
+            df.loc[df["Contact"] == contact, "Bill Number"] = bill_numbers
+            updated_images = list(set(existing_images) - set(images_to_remove) + new_image_links)
+            df.loc[df["Contact"] == contact, "Image Links"] = ",".join(updated_images)
+            
+            # Save updated data to GitHub
+            save_data(df)
+            st.success("Customer data updated successfully!")
+
 # Main function
 def main():
     global df
@@ -200,6 +255,7 @@ def main():
         "Add Customer": add_customer_page,
         "Search Customer": search_customer_page,
         "View All Customers": view_customers_page,
+        "Edit Customer": edit_customer_page,
     }
     choice = st.sidebar.radio("Go to", list(pages.keys()))
     pages[choice]()

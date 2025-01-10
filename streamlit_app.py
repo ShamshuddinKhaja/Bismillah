@@ -178,6 +178,9 @@ def search_customer_page():
 def view_customers_page():
     st.title("View All Customers")
     global df
+    # Reload the data from GitHub to ensure updated data is displayed
+    df = load_data()
+
     if df.empty:
         st.warning("No customer data available. Please add customers.")
     else:
@@ -192,9 +195,6 @@ def view_customers_page():
 
 # Main function
 def main():
-    global df
-    df = load_data()
-
     st.sidebar.title("Navigation")
     pages = {
         "Home": home_page,
@@ -203,6 +203,11 @@ def main():
         "View All Customers": view_customers_page,
     }
     choice = st.sidebar.radio("Go to", list(pages.keys()))
+
+    # Ensure data is reloaded each time to reflect the latest updates
+    global df
+    df = load_data()
+
     pages[choice]()
 
 

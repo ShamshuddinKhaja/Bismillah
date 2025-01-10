@@ -119,7 +119,6 @@ def home_page():
 
 
 def add_customer_page():
-    global df
     st.title("Add New Customer")
     name = st.text_input("Customer Name")
     contact = st.text_input("Contact Number")
@@ -139,6 +138,7 @@ def add_customer_page():
                 image_links.append(file_path)
 
         # Add new customer
+        global df
         new_customer = pd.DataFrame([{
             "Name": name,
             "Contact": contact,
@@ -154,6 +154,7 @@ def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
     if search_query:
+        global df
         df["Name"] = df["Name"].fillna("").astype(str)
         df["Contact"] = df["Contact"].fillna("").astype(str)
 
@@ -176,6 +177,7 @@ def search_customer_page():
 
 def view_customers_page():
     st.title("View All Customers")
+    global df
     if df.empty:
         st.warning("No customer data available. Please add customers.")
     else:

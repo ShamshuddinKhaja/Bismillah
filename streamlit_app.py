@@ -184,7 +184,6 @@ def view_customers_page():
             mime="text/csv"
         )
 
-
 # Main function
 def main():
     global df

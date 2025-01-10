@@ -191,106 +191,94 @@ def view_customers_page():
 
 def edit_customer_page():
     st.title("Edit Customer")
-    
+
     # Check if the DataFrame is empty
     if df.empty:
         st.warning("No customers available. Please add customers first.")
         return
-    
-    # Select customer by contact
-    contact = st.selectbox("Select Customer by Contact Number", df["Contact"].unique())
-    
-    if contact:
+
+    # Search for a customer by name or contact
+    search_query = st.text_input("Search by Name or Contact Number")
+    search_results = df[
+        df["Name"].str.contains(search_query, case=False, na=False) |
+        df["Contact"].str.contains(search_query, case=False, na=False)
+    ] if search_query else pd.DataFrame()
+
+    if search_query and not search_results.empty:
+        st.dataframe(search_results)
+        selected_contact = st.selectbox("Select a customer to edit", search_results["Contact"].values)
+    elif search_query:
+        st.warning("No matching customers found.")
+        return
+    else:
+        st.info("Search for a customer to edit.")
+        return
+
+    if selected_contact:
         # Fetch customer details
-        customer = df[df["Contact"] == contact].iloc[0]
-        
+        customer = df[df["Contact"] == selected_contact].iloc[0]
+
         # Editable fields
         name = st.text_input("Customer Name", value=customer["Name"])
-        
+
         # Safely handle "Bill Number" and ensure it's treated as a string
         existing_bills = str(customer["Bill Number"]).split(",") if pd.notna(customer["Bill Number"]) else []
         bill_numbers = st.text_area(
             "Bill Numbers (Comma-Separated)", 
             value=",".join(existing_bills)
         )
-        
-        # Display existing images
+
+        # Display existing images in a gallery grid
         st.subheader("Existing Images")
         existing_images = str(customer["Image Links"]).split(",") if pd.notna(customer["Image Links"]) else []
         existing_images = [img for img in existing_images if img]  # Filter out empty or None values
         images_to_remove = []
-        
-        for image_link in existing_images:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.image(image_link, caption=image_link.split("/")[-1], use_container_width=True)
-            with col2:
-                if st.button(f"Remove {image_link.split('/')[-1]}"):
-                    images_to_remove.append(image_link)
-        
+
+        if existing_images:
+            cols = st.columns(4)  # Display images in a 4-column grid
+            for index, image_link in enumerate(existing_images):
+                with cols[index % 4]:
+                    # Display a small thumbnail
+                    st.image(image_link, caption=image_link.split("/")[-1], use_container_width=True)
+
+                    # Remove button for each image
+                    if st.button(f"Remove {image_link.split('/')[-1]}", key=f"remove_{index}"):
+                        confirm = st.warning(
+                            f"Are you sure you want to delete {image_link.split('/')[-1]}? This action cannot be undone."
+                        )
+                        if st.button(f"Yes, delete {image_link.split('/')[-1]}", key=f"confirm_remove_{index}"):
+                            delete_image_from_github(image_link)
+                            st.success(f"{image_link.split('/')[-1]} has been deleted.")
+                            st.experimental_rerun()  # Reboot the app to reflect changes
+
+        else:
+            st.warning("No images found for this customer.")
+
         # Upload new images
-        uploaded_files = st.file_uploader("Upload New Images", accept_multiple_files=True)
+        st.subheader("Upload New Images")
+        uploaded_files = st.file_uploader("Choose files to upload", accept_multiple_files=True)
         new_image_links = []
         for uploaded_file in uploaded_files:
-            file_path = upload_image(contact, uploaded_file)
+            file_path = upload_image(selected_contact, uploaded_file)
             if file_path:
                 new_image_links.append(file_path)
         
         # Save changes
         if st.button("Save Changes"):
             # Ensure all lists contain valid strings
-            images_to_remove = [img for img in images_to_remove if img]
             new_image_links = [img for img in new_image_links if img]
             
             # Update customer data in DataFrame
-            df.loc[df["Contact"] == contact, "Name"] = name
-            df.loc[df["Contact"] == contact, "Bill Number"] = bill_numbers
-            updated_images = list(set(existing_images) - set(images_to_remove)) + new_image_links
-            df.loc[df["Contact"] == contact, "Image Links"] = ",".join(updated_images)
-            
-            # Remove images from GitHub
-            for img_to_remove in images_to_remove:
-                delete_image_from_github(img_to_remove)
+            df.loc[df["Contact"] == selected_contact, "Name"] = name
+            df.loc[df["Contact"] == selected_contact, "Bill Number"] = bill_numbers
+            updated_images = list(set(existing_images) + new_image_links)  # Add new images
+            df.loc[df["Contact"] == selected_contact, "Image Links"] = ",".join(updated_images)
             
             # Save updated data to GitHub
             save_data(df)
             st.success("Customer data updated successfully!")
+            st.experimental_rerun()  # Reboot the app to reflect changes
 
-# Function to upload images to the customer's folder on GitHub
-def upload_image(contact, file):
-    file_content = file.read()
-    file_name = file.name
-
-    # Define the folder and file paths
-    folder_path = f"images/{contact}"  # Folder for contact
-    file_path = f"{folder_path}/{file_name}"
-
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
-    file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
-    
-    # Check if the file already exists on GitHub
-    response = requests.get(file_url, headers=headers)
-    sha = None
-    if response.status_code == 200:
-        sha = response.json().get("sha")  # Retrieve existing file's SHA
-
-    # Prepare the payload for GitHub API
-    payload = {
-        "message": f"Add image {file_name} for customer {contact}",
-        "content": base64.b64encode(file_content).decode("utf-8"),
-        "branch": "main",
-    }
-    if sha:
-        payload["sha"] = sha
-
-    # Upload or update the image
-    response = requests.put(file_url, headers=headers, data=json.dumps(payload))
-    if response.status_code in [200, 201]:
-        return file_path
-    else:
-        st.error(f"Failed to upload image {file_name}.")
-        st.error(f"Error Response: {response.json()}")
-        return None
 
 # Function to delete an image from GitHub
 def delete_image_from_github(image_path):
@@ -316,6 +304,7 @@ def delete_image_from_github(image_path):
             st.error(f"Error Response: {delete_response.json()}")
     else:
         st.error(f"Image {image_path.split('/')[-1]} not found on GitHub.")
+
 
 # Main function
 def main():

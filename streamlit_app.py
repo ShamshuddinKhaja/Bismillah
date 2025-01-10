@@ -119,6 +119,7 @@ def home_page():
 
 
 def add_customer_page():
+    global df
     st.title("Add New Customer")
     name = st.text_input("Customer Name")
     contact = st.text_input("Contact Number")
@@ -138,7 +139,6 @@ def add_customer_page():
                 image_links.append(file_path)
 
         # Add new customer
-        global df
         new_customer = pd.DataFrame([{
             "Name": name,
             "Contact": contact,
@@ -147,17 +147,12 @@ def add_customer_page():
         }])
         df = pd.concat([df, new_customer], ignore_index=True)
         save_data(df)
-        st.success("Customer added successfully!")
 
 
 def search_customer_page():
     st.title("Search Customer")
     search_query = st.text_input("Search by Name or Contact")
     if search_query:
-        global df
-        df["Name"] = df["Name"].fillna("").astype(str)
-        df["Contact"] = df["Contact"].fillna("").astype(str)
-
         results = df[
             df["Name"].str.contains(search_query, case=False, na=False) |
             df["Contact"].str.contains(search_query, case=False, na=False)
@@ -178,9 +173,6 @@ def search_customer_page():
 def view_customers_page():
     st.title("View All Customers")
     global df
-    # Reload the data from GitHub to ensure updated data is displayed
-    df = load_data()
-
     if df.empty:
         st.warning("No customer data available. Please add customers.")
     else:
@@ -195,6 +187,9 @@ def view_customers_page():
 
 # Main function
 def main():
+    global df
+    df = load_data()
+
     st.sidebar.title("Navigation")
     pages = {
         "Home": home_page,
@@ -203,11 +198,6 @@ def main():
         "View All Customers": view_customers_page,
     }
     choice = st.sidebar.radio("Go to", list(pages.keys()))
-
-    # Ensure data is reloaded each time to reflect the latest updates
-    global df
-    df = load_data()
-
     pages[choice]()
 
 

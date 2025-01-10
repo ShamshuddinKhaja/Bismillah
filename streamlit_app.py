@@ -200,8 +200,8 @@ def edit_customer_page():
     # Search for a customer by name or contact
     search_query = st.text_input("Search by Name or Contact Number")
     search_results = df[
-        df["Name"].str.contains(search_query, case=False, na=False) |
-        df["Contact"].str.contains(search_query, case=False, na=False)
+        df["Name"].astype(str).str.contains(search_query, case=False, na=False) |
+        df["Contact"].astype(str).str.contains(search_query, case=False, na=False)
     ] if search_query else pd.DataFrame()
 
     if search_query and not search_results.empty:

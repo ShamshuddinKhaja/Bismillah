@@ -192,11 +192,12 @@ def view_customers_page():
 def edit_customer_page():
     st.title("Edit Customer")
     
-    # Select customer by contact
+    # Check if the DataFrame is empty
     if df.empty:
         st.warning("No customers available. Please add customers first.")
         return
     
+    # Select customer by contact
     contact = st.selectbox("Select Customer by Contact Number", df["Contact"].unique())
     
     if contact:
@@ -205,15 +206,17 @@ def edit_customer_page():
         
         # Editable fields
         name = st.text_input("Customer Name", value=customer["Name"])
-        existing_bills = customer["Bill Number"].split(",") if pd.notna(customer["Bill Number"]) else []
+        
+        # Safely handle "Bill Number" and ensure it's treated as a string
+        existing_bills = str(customer["Bill Number"]).split(",") if pd.notna(customer["Bill Number"]) else []
         bill_numbers = st.text_area(
-            "Bill Numbers (Comma-Separated)",
+            "Bill Numbers (Comma-Separated)", 
             value=",".join(existing_bills)
         )
         
         # Display existing images
         st.subheader("Existing Images")
-        existing_images = customer["Image Links"].split(",") if pd.notna(customer["Image Links"]) else []
+        existing_images = str(customer["Image Links"]).split(",") if pd.notna(customer["Image Links"]) else []
         images_to_remove = []
         
         for image_link in existing_images:
